@@ -5,8 +5,8 @@ NUMAI is spreadsheet where formulas can be given in English (or any language) an
 
 The main file is `index.html` in `code`. You then launch your `HTTP server` with python from within the directory `code`.
 
-```python
-`python -m http.server --directory . 8080`
+```sh
+python -m http.server --directory . 8080
 ```
 
 ## Adding a Formula
