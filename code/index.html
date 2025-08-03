@@ -275,7 +275,7 @@
               const selectedRef = match ? `[${match[1]}]` : `[]`;
               const selectedRefeferences = JSON.parse(selectedRef);
               let replaced = false;
-              if (selectedRefeferences.length > 6) {
+              if (selectedRefeferences.length > 10) {
                 formula = formula.replace(selectedRef, `["A1","A2","B1","B2"]`);
                 replaced = true;
               }
@@ -545,11 +545,17 @@
         const fileInput = document.createElement("input");
         fileInput.type = "file";
         fileInput.accept = "application/json";
+        fileInput.style.display = "none"; // Hide the element
+
+        // Append to the document body to prevent garbage collection
+        document.body.appendChild(fileInput);
 
         fileInput.onchange = (event) => {
           const file = event.target.files[0];
           if (file) {
             const reader = new FileReader();
+
+            // Add a handler for successful file read
             reader.onload = (e) => {
               try {
                 const loadedData = JSON.parse(e.target.result);
@@ -564,17 +570,28 @@
                 }
               } catch (error) {
                 console.error("Error parsing JSON file:", error);
+              } finally {
+                // Clean up and remove the element after reading
+                document.body.removeChild(fileInput);
               }
             };
+
+            // Add an error handler for the file read operation
+            reader.onerror = (e) => {
+              console.error("Error reading file:", reader.error);
+              // Clean up and remove the element on error
+              document.body.removeChild(fileInput);
+            };
+
             reader.readAsText(file);
+          } else {
+            // User canceled the file dialog, so clean up
+            document.body.removeChild(fileInput);
           }
         };
 
         fileInput.click();
       }
-
-      document.getElementById('save-button').addEventListener('click', saveGridData);
-      document.getElementById('load-button').addEventListener('click', loadGridData);
 
       renderGrid(myGrid, numRows, numCols);
 
@@ -582,7 +599,7 @@
       const table = document.getElementById('myGrid');
       const calculateButton = document.getElementById('calculate-button');
       const formulaInput = document.getElementById('formula-input');
-
+      
       // Event listeners
 
       // NEW: Event listener for the formula-input field
@@ -605,6 +622,8 @@
       formulaInput.addEventListener('blur', saveFormulaFromInput);
       
 
+      document.getElementById('save-button').addEventListener('click', saveGridData);
+      document.getElementById('load-button').addEventListener('click', loadGridData);
 
       if (table) {
         table.addEventListener('mousedown', (event) => {
