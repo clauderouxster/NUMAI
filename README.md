@@ -28,6 +28,7 @@ For instance, the above description was transformed into:
 ```JavaScript
 getValuesFromReferences(['A1', 'A2', 'A3']).map(Number).reduce((a, b) => a + b * b, 0)
 ```
+You can then _edit_ these formulas to better suit your needs.
 
 ### LM Studio
  By default, this spreadsheet uses a local `LM Studio` sever with as model: `codestral`.
