@@ -1,5 +1,6 @@
 # NUMAI
-NUMAI is spreadsheet where formulas can be given in English (or any language) and translated into actual JavaScript through `[LM Studio](https://lmstudio.ai/)`.
+NUMAI is a basic spreadsheet where formulas can be given in English (or any natural language) and translated into actual JavaScript through `[LM Studio](https://lmstudio.ai/)`.
+This is a very basic `spreadsheet` than can be modified to better suit your needs if necessary. I don't claim that this is fullfledged spreadsheet. 🤫
 
 **Note:** I don't work for `LM Studio` and I have no stake in this company. If you want to change it to a different provider such as `ollama`, you will need to provide your own modification.
 
