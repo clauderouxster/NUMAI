@@ -82,8 +82,11 @@
 
 
   <div class="controls" style="display: flex; align-items: center; gap: 10px;">
-      <button id="calculate-button">Generate</button>
-      <textarea id="formula-input" rows="4" cols="50" placeholder="Edit or view formula here..." style="flex-grow: 1;"></textarea>
+    <button id="calculate-button">Generate</button>
+    <textarea id="formula-input" rows="4" cols="50" placeholder="Edit or view formula here..."
+      style="flex-grow: 1;"></textarea>
+    <button id="save-button">Save</button>
+    <button id="load-button">Load</button>
   </div>
 
   <table id="myGrid"></table>
@@ -305,9 +308,9 @@
                   myGrid[r][c] = formula;
                   const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
                   if (cellElement) {
-                  if (replaced) {
-                    formula = formula.replace(`["A1","A2","B1","B2"]`, selectedRef);
-                  }
+                    if (replaced) {
+                      formula = formula.replace(`["A1","A2","B1","B2"]`, selectedRef);
+                    }
                     cellElement.textContent = formula; // Keep the original formula if code extraction fails
                   }
                 }
@@ -490,13 +493,13 @@
         }
       }
 
-    function selectRow(rowIndex) {
-      clearSelection();
-      const cellsInRow = document.querySelectorAll(`td[data-row-index="${rowIndex}"]`);
-      cellsInRow.forEach(cell => {
+      function selectRow(rowIndex) {
+        clearSelection();
+        const cellsInRow = document.querySelectorAll(`td[data-row-index="${rowIndex}"]`);
+        cellsInRow.forEach(cell => {
           cell.classList.add('selected');
-      });
-    }
+        });
+      }
       function selectColumn(colIndex) {
         clearSelection();
         const cellsInColumn = document.querySelectorAll(`td[data-col-index="${colIndex}"]`);
@@ -514,32 +517,94 @@
       myGrid[2][1] = '60';
       */
 
+      // Save and Load functions
+      function saveGridData() {
+        const dataToSave = {
+          grid: window.myGrid,
+          formulas: window.myFormulas
+        };
+        const dataStr = JSON.stringify(dataToSave);
+        const filename = prompt("Enter a filename to save:", "grid_data.json");
+        if (filename) {
+          const blob = new Blob([dataStr], {
+            type: "application/json"
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          console.log(`Grid data saved as ${filename}.`);
+        }
+      }
+
+      function loadGridData() {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "application/json";
+
+        fileInput.onchange = (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const loadedData = JSON.parse(e.target.result);
+                if (loadedData.grid && loadedData.formulas) {
+                  window.myGrid = loadedData.grid;
+                  window.myFormulas = loadedData.formulas;
+                  renderGrid(window.myGrid, numRows, numCols);
+                  recalculateAllFormulas();
+                  console.log("Grid data loaded successfully.");
+                } else {
+                  console.error("Invalid file format. 'grid' and 'formulas' properties are missing.");
+                }
+              } catch (error) {
+                console.error("Error parsing JSON file:", error);
+              }
+            };
+            reader.readAsText(file);
+          }
+        };
+
+        fileInput.click();
+      }
+
+      document.getElementById('save-button').addEventListener('click', saveGridData);
+      document.getElementById('load-button').addEventListener('click', loadGridData);
+
       renderGrid(myGrid, numRows, numCols);
+
 
       const table = document.getElementById('myGrid');
       const calculateButton = document.getElementById('calculate-button');
       const formulaInput = document.getElementById('formula-input');
 
+      // Event listeners
+
       // NEW: Event listener for the formula-input field
-      if (formulaInput) {
-        formulaInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault(); // Prevent new line
-            saveFormulaFromInput();
-            // Optionally, move to the next cell after saving
-            if (activeCell) {
-              let rowIndex = parseInt(activeCell.dataset.rowIndex);
-              let colIndex = parseInt(activeCell.dataset.colIndex);
-              const nextRowIndex = Math.min(numRows - 1, rowIndex + 1);
-              const nextCell = document.querySelector(`[data-row-index="${nextRowIndex}"][data-col-index="${colIndex}"]`);
-              if (nextCell) {
-                enableEditing(nextCell);
-              }
+      formulaInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault(); // Prevent new line
+          saveFormulaFromInput();
+          // Optionally, move to the next cell after saving
+          if (activeCell) {
+            let rowIndex = parseInt(activeCell.dataset.rowIndex);
+            let colIndex = parseInt(activeCell.dataset.colIndex);
+            const nextRowIndex = Math.min(numRows - 1, rowIndex + 1);
+            const nextCell = document.querySelector(`[data-row-index="${nextRowIndex}"][data-col-index="${colIndex}"]`);
+            if (nextCell) {
+              enableEditing(nextCell);
             }
           }
-        });
-        formulaInput.addEventListener('blur', saveFormulaFromInput);
-      }
+        }
+      });
+      formulaInput.addEventListener('blur', saveFormulaFromInput);
+      
+
 
       if (table) {
         table.addEventListener('mousedown', (event) => {
@@ -558,15 +623,15 @@
               selectColumn(colIndex);
               isSelecting = false;
             }
-          } 
+          }
           else if (cell.tagName === 'TD' && cell.classList.contains('header-cell')) {
             // Nouvelle condition pour détecter un clic sur un en-tête de ligne
             const row = cell.closest('tr');
             if (row) {
-                const rowIndex = Array.from(row.parentNode.children).indexOf(row);
-                if (rowIndex >= 0) {
-                    selectRow(rowIndex);
-                }
+              const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+              if (rowIndex >= 0) {
+                selectRow(rowIndex);
+              }
             }
           } else if (cell.dataset.rowIndex !== undefined && !cell.classList.contains('header-cell')) {
             isSelecting = true;
