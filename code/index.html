@@ -272,7 +272,7 @@
               const selectedRef = match ? `[${match[1]}]` : `[]`;
               const selectedRefeferences = JSON.parse(selectedRef);
               let replaced = false;
-              if (selectedRefeferences.length > 10) {
+              if (selectedRefeferences.length > 6) {
                 formula = formula.replace(selectedRef, `["A1","A2","B1","B2"]`);
                 replaced = true;
               }
