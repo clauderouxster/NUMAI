@@ -305,6 +305,9 @@
                   myGrid[r][c] = formula;
                   const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
                   if (cellElement) {
+                  if (replaced) {
+                    formula = formula.replace(`["A1","A2","B1","B2"]`, selectedRef);
+                  }
                     cellElement.textContent = formula; // Keep the original formula if code extraction fails
                   }
                 }
