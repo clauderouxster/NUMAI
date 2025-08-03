@@ -1,0 +1,17 @@
+        
+        //This is the code that controls the LLM and that should be included in index.html
+        
+        <script src="dist/lmstudio.bundle.js"></script>
+
+        async function call_lm_studio(baseurl, model, prompt) {
+            try {
+                if (typeof lm_studio !== 'function') throw new Error("lm_studio function not found. Check lmstudio.bundle.js");
+                const result = await lm_studio(baseurl, model, prompt); return result;
+            } catch (error) {
+                const msg = "LM Studio API Error: " + (error.message || error) + "\n";
+                console.error(msg, "URL:", baseurl, "Model:", model, "Prompt:", prompt); 
+                const outputElem = currentAgent ? document.getElementById(`eval-${currentAgent}`) : document.getElementById('consoleOutput');
+                if (outputElem) { outputElem.value += msg; outputElem.scrollTop = outputElem.scrollHeight; }
+                throw error; 
+            }
+        }

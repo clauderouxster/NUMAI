@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grille JS Éditable et Sélectionnable</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      user-select: none;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 800px;
+      margin-top: 20px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+      min-width: 50px;
+      height: 30px;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    td:first-child,
+    th:first-child {
+      background-color: #f9f9f9;
+      font-weight: bold;
+    }
+
+    .header-cell {
+      background-color: #e0e0e0;
+    }
+
+    .edit-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border: none;
+      text-align: center;
+      padding: 8px;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .selected {
+      background-color: #d8e6f9;
+    }
+
+    .controls {
+      margin-top: 20px;
+    }
+
+    .controls button {
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>NUMAI</h1>
+
+
+  <div class="controls" style="display: flex; align-items: center; gap: 10px;">
+      <button id="calculate-button">Generate</button>
+      <textarea id="formula-input" rows="4" cols="50" placeholder="Edit or view formula here..." style="flex-grow: 1;"></textarea>
+  </div>
+
+  <table id="myGrid"></table>
+  <script src="dist/lmstudio.bundle.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM est chargé, le script va s\'exécuter.');
+
+      const numRows = 100;
+      const numCols = 26;
+      window.myGrid = createGridData(numRows, numCols);
+      window.myFormulas = createGridData(numRows, numCols);
+      window.activeCell = null;
+
+      //LM Studio connection parameters
+      window.baseurl = "ws://localhost:1234";
+      window.model = "codestral-22b-v0.1-mlx-3";
+
+      let isSelecting = false;
+      let startRowIndex = null;
+      let startColIndex = null;
+      let currentEndRowIndex = null;
+      let currentEndColIndex = null;
+
+      function getColumnName(colIndex) {
+        let columnName = '';
+        let tempIndex = colIndex + 1;
+        while (tempIndex > 0) {
+          const remainder = (tempIndex - 1) % 26;
+          columnName = String.fromCharCode(65 + remainder) + columnName;
+          tempIndex = Math.floor((tempIndex - 1) / 26);
+        }
+        return columnName;
+      }
+
+      function getCellName(rowIndex, colIndex) {
+        const columnName = getColumnName(colIndex);
+        const rowNumber = rowIndex + 1;
+        return `${columnName}${rowNumber}`;
+      }
+
+      function createGridData(rows, cols) {
+        const grid = [];
+        for (let i = 0; i < rows; i++) {
+          grid[i] = new Array(cols).fill('');
+        }
+        return grid;
+      }
+
+      function renderGrid(gridData, rows, cols) {
+        console.log('Début du rendu de la grille.');
+        const table = document.getElementById('myGrid');
+        if (!table) {
+          console.error('L\'élément avec l\'ID "myGrid" n\'a pas été trouvé.');
+          return;
+        }
+        table.innerHTML = '';
+
+        const thead = table.createTHead();
+        const headerRow = thead.insertRow();
+        headerRow.insertCell().classList.add('header-cell');
+
+        for (let c = 0; c < cols; c++) {
+          const th = document.createElement('th');
+          th.textContent = getColumnName(c);
+          headerRow.appendChild(th);
+        }
+
+        const tbody = table.createTBody();
+        for (let r = 0; r < rows; r++) {
+          const row = tbody.insertRow();
+
+          const rowHeaderCell = row.insertCell();
+          rowHeaderCell.textContent = r + 1;
+          rowHeaderCell.classList.add('header-cell');
+
+          for (let c = 0; c < cols; c++) {
+            const cell = row.insertCell();
+            cell.textContent = gridData[r][c];
+            cell.dataset.rowIndex = r;
+            cell.dataset.colIndex = c;
+          }
+        }
+        console.log('Rendu de la grille terminé.');
+      }
+
+      async function call_lm_studio(baseurl, model, prompt) {
+        try {
+          if (typeof lm_studio !== 'function') throw new Error("lm_studio function not found. Check lmstudio.bundle.js");
+          const result = await lm_studio(baseurl, model, prompt);
+          return result;
+        } catch (error) {
+          const msg = "LM Studio API Error: " + (error.message || error) + "\n";
+          console.error(msg, "URL:", baseurl, "Model:", model, "Prompt:", prompt);
+          const outputElem = currentAgent ? document.getElementById(`eval-${currentAgent}`) : document.getElementById('consoleOutput');
+          if (outputElem) {
+            outputElem.value += msg;
+            outputElem.scrollTop = outputElem.scrollHeight;
+          }
+          throw error;
+        }
+      }
+
+      function getIndicesFromCellName(cellName) {
+        const match = cellName.match(/([A-Z]+)(\d+)/);
+        if (!match) {
+          console.error(`Format de référence de cellule invalide : ${cellName}`);
+          return null;
+        }
+
+        const colName = match[1];
+        const rowNum = parseInt(match[2], 10);
+
+        let colIndex = 0;
+        for (let i = 0; i < colName.length; i++) {
+          colIndex = colIndex * 26 + (colName.charCodeAt(i) - 64);
+        }
+        colIndex--;
+
+        const rowIndex = rowNum - 1;
+
+        return {
+          rowIndex,
+          colIndex
+        };
+      }
+
+      function getValuesFromReferences(cellReferences) {
+        const values = [];
+        const gridData = window.myGrid;
+
+        if (!gridData) {
+          console.error("La variable 'myGrid' n'est pas définie ou accessible.");
+          return values;
+        }
+
+        cellReferences.forEach(ref => {
+          const indices = getIndicesFromCellName(ref);
+          if (indices) {
+            const {
+              rowIndex,
+              colIndex
+            } = indices;
+            if (gridData[rowIndex] && gridData[rowIndex][colIndex] !== undefined && gridData[rowIndex][colIndex] !== '') {
+              values.push(Number(gridData[rowIndex][colIndex]));
+            } else {
+              values.push(0);
+            }
+          }
+        });
+
+        return values;
+      }
+
+      // NEW: Function to calculate all formulas in the grid
+      /**
+       * Extracts a JavaScript code block or a single line of JS from a string.
+       * It handles markdown code blocks (```javascript...```) and assumes a single line
+       * of code is a valid response if no code block is found.
+       * @param {string} response The raw response from the LLM.
+       * @returns {string|null} The extracted code or null if no code is found.
+       */
+      function extractCode(response) {
+        // Regex to find a markdown code block for JavaScript
+        const codeBlockRegex = /```(?:javascript|js)\n([\s\S]*?)\n```/;
+        const match = response.match(codeBlockRegex);
+
+        if (match && match[1]) {
+          // Return the content of the code block
+          return match[1].trim();
+        }
+
+        // If no code block is found, assume the entire response is a single line of JS
+        // This is based on the system prompt asking for a single line of code
+        return response.trim();
+      }
+
+      async function generateFormulas() {
+        console.log("Starting formula calculation...");
+        for (let r = 0; r < numRows; r++) {
+          for (let c = 0; c < numCols; c++) {
+            const cellValue = myGrid[r][c];
+            if (typeof cellValue === 'string' && cellValue.startsWith('=')) {
+              const formula = cellValue;
+              //const match = formula.match(/\[(.*?)\]/);
+              //const selectedReferences = match ? `[${match[1]}]` : `[]`;
+
+              const systemPrompt = "You are a JavaScript expert. Your task is to write a single line of JavaScript code that performs a mathematical operation on an array of numbers. This array of numbers is derived by calling the `getValuesFromReferences()` function with a list of cell reference strings. The output of your code should be the final calculated value. For example, if the user asks to 'sum' a list of references, you should generate code like `getValuesFromReferences(['A1', 'B1']).map(Number).reduce((a, b) => a + b, 0)`. Please returns the result in javascript mardown section.";
+              const userPrompt = `${formula.substring(1)}`;
+
+              try {
+                const llmResponse = await call_lm_studio(baseurl, model, systemPrompt + "\n" + userPrompt);
+
+                // Use the new function to extract code from the response
+                const codeToExecute = extractCode(llmResponse);
+
+                if (codeToExecute) {
+                  // Execute the generated JS code
+                  myFormulas[r][c] = codeToExecute;
+                  const result = eval(codeToExecute);
+                  myGrid[r][c] = result;
+                  const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+                  if (cellElement) {
+                    cellElement.textContent = result;
+                  }
+                  console.log(`Calculated formula in cell ${getCellName(r, c)}. Result: ${result}`);
+                  recalculateAllFormulas();
+                } else {
+                  console.error(`LLM response for cell ${getCellName(r, c)} did not contain valid code.`);
+                  myGrid[r][c] = formula;
+                  const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+                  if (cellElement) {
+                    cellElement.textContent = formula; // Keep the original formula if code extraction fails
+                  }
+                }
+
+              } catch (error) {
+                console.error(`Error calling LLM or executing generated code for cell ${getCellName(r, c)}:`, error);
+                myGrid[r][c] = formula;
+                const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+                if (cellElement) {
+                  cellElement.textContent = formula;
+                }
+              }
+            }
+          }
+        }
+        console.log("Formula calculation complete.");
+      }
+
+      // NEW: Function to re-evaluate all formulas in the grid
+      function recalculateAllFormulas() {
+        //we do it twice...
+        for (let nb = 0; nb < 2; nb++) {
+          for (let r = 0; r < numRows; r++) {
+            for (let c = 0; c < numCols; c++) {
+              const formulaCode = myFormulas[r][c];
+              if (formulaCode) {
+                try {
+                  // Execute the stored JS code
+                  const result = eval(formulaCode);
+                  // Update the myGrid data with the new result
+                  myGrid[r][c] = result;
+                  // Update the display of the cell
+                  const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+                  if (cellElement) {
+                    cellElement.textContent = result;
+                  }
+                  console.log(`Recalculated cell ${getCellName(r, c)}. Result: ${result}`);
+                } catch (error) {
+                  console.error(`Error recalculating formula in cell ${getCellName(r, c)}:`, error);
+                  // Optionally, display an error in the cell
+                  const cellElement = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+                  if (cellElement) {
+                    cellElement.textContent = "#ERROR!";
+                  }
+                }
+              }
+            }
+          }
+        }
+        console.log("Formula recalculation complete.");
+      }
+
+      // NEW: Function to save the formula from the textarea to the grid
+      function saveFormulaFromInput() {
+        if (!activeCell) return;
+
+        const rowIndex = parseInt(activeCell.dataset.rowIndex);
+        const colIndex = parseInt(activeCell.dataset.colIndex);
+        const formulaInput = document.getElementById('formula-input');
+        const newFormula = formulaInput.value.trim();
+
+        if (newFormula) {
+          myFormulas[rowIndex][colIndex] = newFormula;
+          try {
+            recalculateAllFormulas();
+          } catch (error) {
+            console.error(`Error evaluating formula in cell ${getCellName(rowIndex, colIndex)}:`, error);
+            myGrid[rowIndex][colIndex] = '#ERROR!';
+            activeCell.textContent = '#ERROR!';
+          }
+        } else {
+          // If the formula is empty, clear the formula and keep the original value
+          myFormulas[rowIndex][colIndex] = '';
+          myGrid[rowIndex][colIndex] = activeCell.textContent; // Or some default value
+        }
+      }
+
+      function enableEditing(cell) {
+        clearSelection();
+        if (activeCell !== null) {
+          const rowIndexA = parseInt(activeCell.dataset.rowIndex);
+          const colIndexA = parseInt(activeCell.dataset.colIndex);
+          activeCell.textContent = myGrid[rowIndexA][colIndexA];
+        }
+
+        activeCell = cell;
+        const formulaInput = document.getElementById('formula-input');
+        const rowIndex = parseInt(cell.dataset.rowIndex);
+        const colIndex = parseInt(cell.dataset.colIndex);
+
+        formulaInput.value = myFormulas[rowIndex][colIndex] || myGrid[rowIndex][colIndex];
+
+        const currentValue = myGrid[parseInt(rowIndex)][parseInt(colIndex)];
+        input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'edit-input';
+
+        input.value = currentValue;
+
+        cell.textContent = '';
+        cell.appendChild(input);
+        input.focus();
+
+        const saveValue = async (e) => {
+          let newValue = input.value;
+
+          if (e && e.type === 'keypress' && e.key === 'Enter') {
+            if (newValue.startsWith('=')) {
+              myFormulas[rowIndex][colIndex] = "";
+              const selectedReferences = getSelectedCellReferences();
+
+              // The user's prompt is a combination of the formula and selected references
+              newValue += `${JSON.stringify(selectedReferences)}`;
+              myGrid[rowIndex][colIndex] = newValue;
+              cell.textContent = newValue;
+            }
+            else {
+              cell.textContent = newValue;
+              if (newValue != myGrid[rowIndex][colIndex]) {
+                myFormulas[rowIndex][colIndex] = "";
+                myGrid[rowIndex][colIndex] = newValue;
+                recalculateAllFormulas();
+              }
+            }
+
+            // Simply update the grid data and the cell's text content            
+            const nextRowIndex = rowIndex + 1;
+            const nextColIndex = colIndex;
+
+            if (nextRowIndex < numRows) {
+              const nextCell = document.querySelector(`[data-row-index="${nextRowIndex}"][data-col-index="${nextColIndex}"]`);
+              if (nextCell) {
+                enableEditing(nextCell);
+              }
+            }
+          }
+        };
+
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            saveValue(e);
+          }
+        });
+
+        input.addEventListener('blur', () => saveValue());
+      }
+
+      function clearSelection() {
+        document.querySelectorAll('.selected').forEach(cell => {
+          cell.classList.remove('selected');
+        });
+      }
+
+      function getSelectedCellReferences() {
+        const selectedCells = document.querySelectorAll('.selected');
+        const references = [];
+        selectedCells.forEach(cell => {
+          const rowIndex = parseInt(cell.dataset.rowIndex);
+          const colIndex = parseInt(cell.dataset.colIndex);
+          references.push(getCellName(rowIndex, colIndex));
+        });
+        return references;
+      }
+
+      function highlightSelection(startR, startC, endR, endC) {
+        clearSelection();
+
+        const minRow = Math.min(startR, endR);
+        const maxRow = Math.max(startR, endR);
+        const minCol = Math.min(startC, endC);
+        const maxCol = Math.max(startC, endC);
+
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            const cell = document.querySelector(`[data-row-index="${r}"][data-col-index="${c}"]`);
+            if (cell) {
+              cell.classList.add('selected');
+            }
+          }
+        }
+      }
+
+    function selectRow(rowIndex) {
+      clearSelection();
+      const cellsInRow = document.querySelectorAll(`td[data-row-index="${rowIndex}"]`);
+      cellsInRow.forEach(cell => {
+          cell.classList.add('selected');
+      });
+    }
+      function selectColumn(colIndex) {
+        clearSelection();
+        const cellsInColumn = document.querySelectorAll(`td[data-col-index="${colIndex}"]`);
+        cellsInColumn.forEach(cell => {
+          cell.classList.add('selected');
+        });
+      }
+
+      /*
+      myGrid[0][0] = '10';
+      myGrid[0][1] = '20';
+      myGrid[1][0] = '30';
+      myGrid[1][1] = '40';
+      myGrid[2][0] = '50';
+      myGrid[2][1] = '60';
+      */
+
+      renderGrid(myGrid, numRows, numCols);
+
+      const table = document.getElementById('myGrid');
+      const calculateButton = document.getElementById('calculate-button');
+      const formulaInput = document.getElementById('formula-input');
+
+      // NEW: Event listener for the formula-input field
+      if (formulaInput) {
+        formulaInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault(); // Prevent new line
+            saveFormulaFromInput();
+            // Optionally, move to the next cell after saving
+            if (activeCell) {
+              let rowIndex = parseInt(activeCell.dataset.rowIndex);
+              let colIndex = parseInt(activeCell.dataset.colIndex);
+              const nextRowIndex = Math.min(numRows - 1, rowIndex + 1);
+              const nextCell = document.querySelector(`[data-row-index="${nextRowIndex}"][data-col-index="${colIndex}"]`);
+              if (nextCell) {
+                enableEditing(nextCell);
+              }
+            }
+          }
+        });
+        formulaInput.addEventListener('blur', saveFormulaFromInput);
+      }
+
+      if (table) {
+        table.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          const cell = event.target.closest('td, th');
+          if (!cell) {
+            isSelecting = false;
+            startRowIndex = null;
+            startColIndex = null;
+            return;
+          }
+
+          if (cell.tagName === 'TH' && !cell.classList.contains('header-cell')) {
+            const colIndex = Array.from(cell.parentNode.children).indexOf(cell) - 1;
+            if (colIndex >= 0) {
+              selectColumn(colIndex);
+              isSelecting = false;
+            }
+          } 
+          else if (cell.tagName === 'TD' && cell.classList.contains('header-cell')) {
+            // Nouvelle condition pour détecter un clic sur un en-tête de ligne
+            const row = cell.closest('tr');
+            if (row) {
+                const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+                if (rowIndex >= 0) {
+                    selectRow(rowIndex);
+                }
+            }
+          } else if (cell.dataset.rowIndex !== undefined && !cell.classList.contains('header-cell')) {
+            isSelecting = true;
+            startRowIndex = parseInt(cell.dataset.rowIndex);
+            startColIndex = parseInt(cell.dataset.colIndex);
+
+            if (event.ctrlKey || event.metaKey) {
+              // For multiple selection (not implemented)
+            } else {
+              clearSelection();
+            }
+            cell.classList.add('selected');
+          } else {
+            isSelecting = false;
+            startRowIndex = null;
+            startColIndex = null;
+          }
+        });
+
+        document.addEventListener('mousemove', (event) => {
+          if (!isSelecting || startRowIndex === null) return;
+          const cell = event.target.closest('td');
+          if (cell && cell.dataset.rowIndex !== undefined && !cell.classList.contains('header-cell')) {
+            currentEndRowIndex = parseInt(cell.dataset.rowIndex);
+            currentEndColIndex = parseInt(cell.dataset.colIndex);
+            highlightSelection(startRowIndex, startColIndex, currentEndRowIndex, currentEndColIndex);
+          }
+          else
+            console.log("Bizarre");
+        });
+
+        document.addEventListener('mouseup', () => {
+          isSelecting = false;
+          startRowIndex = null;
+          startColIndex = null;
+          currentEndRowIndex = null;
+          currentEndColIndex = null;
+        });
+
+        document.addEventListener('keydown', (e) => {
+          // Find the currently active input field
+          const activeElement = document.activeElement;
+          if (!activeElement || !activeElement.classList.contains('edit-input')) {
+            return; // Exit if no cell is being edited
+          }
+
+          const cell = activeElement.closest('td');
+          if (!cell) {
+            return;
+          }
+
+          let rowIndex = parseInt(cell.dataset.rowIndex);
+          let colIndex = parseInt(cell.dataset.colIndex);
+
+          let nextRowIndex = rowIndex;
+          let nextColIndex = colIndex;
+
+          const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+
+          if (isArrowKey) {
+            e.preventDefault(); // Prevent default browser scroll behavior
+
+            switch (e.key) {
+              case 'ArrowUp':
+                nextRowIndex = Math.max(0, rowIndex - 1);
+                break;
+              case 'ArrowDown':
+                nextRowIndex = Math.min(numRows - 1, rowIndex + 1);
+                break;
+              case 'ArrowLeft':
+                nextColIndex = Math.max(0, colIndex - 1);
+                break;
+              case 'ArrowRight':
+                nextColIndex = Math.min(numCols - 1, colIndex + 1);
+                break;
+            }
+
+            // If the position changed, move to the new cell
+            if (nextRowIndex !== rowIndex || nextColIndex !== colIndex) {
+              const nextCell = document.querySelector(`[data-row-index="${nextRowIndex}"][data-col-index="${nextColIndex}"]`);
+              if (nextCell) {
+                // Before moving, save the current cell's value
+                const input = cell.querySelector('.edit-input');
+                if (input) {
+                  const newValue = input.value;
+                  if (myGrid[rowIndex][colIndex] !== newValue) {
+                    myGrid[rowIndex][colIndex] = newValue;
+                    cell.textContent = newValue;
+                    recalculateAllFormulas();
+                  }
+                }
+                // Now, enable editing on the new cell
+                enableEditing(nextCell);
+              }
+            }
+          }
+        });
+
+        table.addEventListener('click', (event) => {
+          const cell = event.target.closest('td');
+          if (cell && !cell.classList.contains('header-cell') && !isSelecting) {
+            enableEditing(cell);
+          }
+        });
+      }
+
+      // NEW: Add click listener to the new button
+      if (calculateButton) {
+        calculateButton.addEventListener('click', generateFormulas);
+      }
+    });
+  </script>
+
+</body>
+
+</html>
