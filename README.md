@@ -14,15 +14,20 @@ python -m http.server --directory . 8080
 ## Adding a Formula
 
 You must start your cell content with: `=`.
-    For instance: `= sum of the values:`
+    For instance: `= sum of the squared values:`
 
 Then you select your values with the mouse, and you press enter. 
 
-The cell should then contain: `= sum of the values:["A1","A2","A3"]`
+The cell should then contain: `= sum of the squared values:["A1","A2","A3"]`
 
 ## Generating
 
 You can add as many formula descriptions as you want. To transform them into actual JavaScript code, you press `Generate`.
+For instance, the above description was transformed into:
+
+```JavaScript
+getValuesFromReferences(['A1', 'A2', 'A3']).map(Number).reduce((a, b) => a + b * b, 0)
+```
 
 ### LM Studio
  By default, this spreadsheet uses a local `LM Studio` sever with as model: `codestral`.
