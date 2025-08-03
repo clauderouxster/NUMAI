@@ -267,9 +267,15 @@
           for (let c = 0; c < numCols; c++) {
             const cellValue = myGrid[r][c];
             if (typeof cellValue === 'string' && cellValue.startsWith('=')) {
-              const formula = cellValue;
-              //const match = formula.match(/\[(.*?)\]/);
-              //const selectedReferences = match ? `[${match[1]}]` : `[]`;
+              let formula = cellValue;
+              const match = formula.match(/\[(.*?)\]/);
+              const selectedRef = match ? `[${match[1]}]` : `[]`;
+              const selectedRefeferences = JSON.parse(selectedRef);
+              let replaced = false;
+              if (selectedRefeferences.length > 10) {
+                formula = formula.replace(selectedRef, `["A1","A2","B1","B2"]`);
+                replaced = true;
+              }
 
               const systemPrompt = "You are a JavaScript expert. Your task is to write a single line of JavaScript code that performs a mathematical operation on an array of numbers. This array of numbers is derived by calling the `getValuesFromReferences()` function with a list of cell reference strings. The output of your code should be the final calculated value. For example, if the user asks to 'sum' a list of references, you should generate code like `getValuesFromReferences(['A1', 'B1']).map(Number).reduce((a, b) => a + b, 0)`. Please returns the result in javascript mardown section.";
               const userPrompt = `${formula.substring(1)}`;
@@ -278,10 +284,13 @@
                 const llmResponse = await call_lm_studio(baseurl, model, systemPrompt + "\n" + userPrompt);
 
                 // Use the new function to extract code from the response
-                const codeToExecute = extractCode(llmResponse);
+                let codeToExecute = extractCode(llmResponse);
 
                 if (codeToExecute) {
                   // Execute the generated JS code
+                  if (replaced) {
+                    codeToExecute = codeToExecute.replace(`["A1","A2","B1","B2"]`, selectedRef);
+                  }
                   myFormulas[r][c] = codeToExecute;
                   const result = eval(codeToExecute);
                   myGrid[r][c] = result;
@@ -357,7 +366,7 @@
         const formulaInput = document.getElementById('formula-input');
         const newFormula = formulaInput.value.trim();
 
-        if (newFormula) {
+        if (myFormulas[rowIndex][colIndex]) {
           myFormulas[rowIndex][colIndex] = newFormula;
           try {
             recalculateAllFormulas();
@@ -369,7 +378,7 @@
         } else {
           // If the formula is empty, clear the formula and keep the original value
           myFormulas[rowIndex][colIndex] = '';
-          myGrid[rowIndex][colIndex] = activeCell.textContent; // Or some default value
+          myGrid[rowIndex][colIndex] = newFormula; // Or some default value
         }
       }
 
