@@ -214,7 +214,7 @@
         };
       }
 
-      function getValuesFromReferences(cellReferences) {
+      function getValues(cellReferences) {
         const values = [];
         const gridData = window.myGrid;
 
@@ -239,6 +239,10 @@
         });
 
         return values;
+      }
+
+      function getValuesFromReferences(cells) {
+        return getValues(cells);
       }
 
       // NEW: Function to calculate all formulas in the grid
@@ -280,7 +284,7 @@
                 replaced = true;
               }
 
-              const systemPrompt = "You are a JavaScript expert. Your task is to write a single line of JavaScript code that performs a mathematical operation on an array of numbers. This array of numbers is derived by calling the `getValuesFromReferences()` function with a list of cell reference strings. The output of your code should be the final calculated value. For example, if the user asks to 'sum' a list of references, you should generate code like `getValuesFromReferences(['A1', 'B1']).map(Number).reduce((a, b) => a + b, 0)`. Please returns the result in javascript mardown section.";
+              const systemPrompt = "You are a JavaScript expert. Your task is to write a single line of JavaScript code that performs a mathematical operation on an array of numbers. This array of numbers is derived by calling the `getValues()` function with a list of cell reference strings. The output of your code should be the final calculated value. For example, if the user asks to 'sum' a list of references, you should generate code like `getValues(['A1', 'B1']).map(Number).reduce((a, b) => a + b, 0)`. Please returns the result in javascript mardown section.";
               const userPrompt = `${formula.substring(1)}`;
 
               try {
@@ -412,7 +416,7 @@
             activeCell.textContent = '#ERROR!';
           }
         } else {
-          if (newFormula.includes("getValuesFromReferences")) {
+          if (newFormula.includes("GetValues")) {
             const match = newFormula.match(/\[(.*?)\]/);
             const selectedCells = match ? `[${match[1]}]` : `[]`;
             let selectedRef = selectedCells;
