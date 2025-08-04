@@ -425,7 +425,7 @@
             const checkType = checkLines(selectedReferences);
             if (checkType == 1) {
               newref = selectedReferences.map(ref => {
-                return ref[0] + String(rowIndex+1);
+                return ref[0] + String(rowIndex + 1);
               });
             }
             else if (checkType == 2) {
@@ -469,6 +469,29 @@
             myGrid[rowIndex][colIndex] = newFormula; // Or some default value
           }
         }
+      }
+
+      // Fonction pour supprimer le contenu des cellules sélectionnées
+      function deleteSelectedCells() {
+        const selectedCells = document.querySelectorAll('.selected');
+
+        selectedCells.forEach(cell => {
+          if (!cell.classList.contains('header-cell')) {
+            const rowIndex = parseInt(cell.dataset.rowIndex);
+            const colIndex = parseInt(cell.dataset.colIndex);
+
+            // Vider les données de la grille
+            myGrid[rowIndex][colIndex] = '';
+            // Vider les formules
+            myFormulas[rowIndex][colIndex] = '';
+            // Mettre à jour l'affichage de la cellule
+            cell.textContent = '';
+          }
+        });
+
+        // Recalculer toutes les formules après suppression
+        recalculateAllFormulas();
+        formulaInput.value = "";
       }
 
       function enableEditing(cell) {
@@ -780,6 +803,18 @@
 
           const cell = activeElement.closest('td');
           if (!cell) {
+            return;
+          }
+
+          // Si on n'est pas en train d'éditer une cellule et qu'on presse Suppr ou Backspace
+          if (e.key === 'Delete' || e.key === 'Backspace') {
+            const selectedCells = document.querySelectorAll('.selected');
+
+            // S'il y a des cellules sélectionnées, les supprimer
+            if (selectedCells.length > 0) {
+              e.preventDefault(); // Empêcher le comportement par défaut du navigateur
+              deleteSelectedCells();
+            }
             return;
           }
 
