@@ -382,9 +382,31 @@
             activeCell.textContent = '#ERROR!';
           }
         } else {
-          // If the formula is empty, clear the formula and keep the original value
-          myFormulas[rowIndex][colIndex] = '';
-          myGrid[rowIndex][colIndex] = newFormula; // Or some default value
+          if (newFormula.includes("getValuesFromReferences")) {
+              const match = newFormula.match(/\[(.*?)\]/);
+              const selectedRef = match ? `[${match[1]}]` : `[]`;
+              const selectedReferences = JSON.parse(selectedRef);
+              //The list of references  
+              const newref = selectedReferences.map(ref => {
+                const indices = getIndicesFromCellName(ref);
+                const col = String.fromCharCode(colIndex + 65);
+                return col + ref.substring(1);
+              });
+              const thenewFormula = newFormula.replace(selectedRef, JSON.stringify(newref));
+              myFormulas[rowIndex][colIndex] = thenewFormula;
+              try {
+                recalculateAllFormulas();
+              } catch (error) {
+                console.error(`Error evaluating formula in cell ${getCellName(rowIndex, colIndex)}:`, error);
+                myGrid[rowIndex][colIndex] = '#ERROR!';
+                activeCell.textContent = '#ERROR!';
+              }
+          }
+          else {
+            // If the formula is empty, clear the formula and keep the original value
+            myFormulas[rowIndex][colIndex] = '';
+            myGrid[rowIndex][colIndex] = newFormula; // Or some default value
+          }
         }
       }
 
