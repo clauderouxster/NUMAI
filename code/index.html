@@ -416,7 +416,7 @@
             activeCell.textContent = '#ERROR!';
           }
         } else {
-          if (newFormula.includes("GetValues")) {
+          if (newFormula.includes("getValues")) {
             const match = newFormula.match(/\[(.*?)\]/);
             const selectedCells = match ? `[${match[1]}]` : `[]`;
             let selectedRef = selectedCells;
