@@ -366,12 +366,15 @@
       function checkLines(tableau) {
         // Gérer le cas où le tableau est vide ou n'a qu'un seul élément
         if (!tableau || tableau.length <= 1) {
-          return false;
+          return 1;
         }
 
         // Extraire la partie numérique de la première chaîne
+        const colonneDeReference = tableau[0][0];
         const ligneDeReference = tableau[0].substring(1); // On prend tout ce qui est après le premier caractère
 
+        let memeLigne = 1;
+        let memeColonne = 2;
         // Parcourir le reste du tableau et comparer
         for (let i = 1; i < tableau.length; i++) {
           // Extraire la partie numérique de la chaîne actuelle
@@ -379,12 +382,15 @@
 
           // Si une des lignes ne correspond pas, on renvoie false immédiatement
           if (ligneActuelle !== ligneDeReference) {
-            return false;
+            memeLigne = 0;
+          }
+          if (colonneDeReference != tableau[i][0]) {
+            memeColonne = 0;
           }
         }
 
         // Si la boucle se termine sans trouver de différence, toutes les lignes sont identiques
-        return true;
+        return (memeLigne + memeColonne);
       }
 
       // NEW: Function to save the formula from the textarea to the grid
@@ -416,12 +422,13 @@
             const selectedReferences = JSON.parse(selectedRef);
             let newref = null;
             //The list of references
-            if (checkLines(selectedReferences)) {
+            const checkType = checkLines(selectedReferences);
+            if (checkType == 1) {
               newref = selectedReferences.map(ref => {
                 return ref[0] + String(rowIndex+1);
               });
             }
-            else {
+            else if (checkType == 2) {
               let diff = null;
               newref = selectedReferences.map(ref => {
                 const indices = getIndicesFromCellName(ref);
@@ -430,6 +437,20 @@
                 }
                 const col = String.fromCharCode(indices.colIndex + diff + 65);
                 return col + ref.substring(1);
+              });
+            }
+            else {
+              let diffC = null;
+              let diffR = null;
+              newref = selectedReferences.map(ref => {
+                const indices = getIndicesFromCellName(ref);
+                if (diffC === null) {
+                  diffR = rowIndex - indices.rowIndex;
+                  diffC = colIndex - indices.colIndex;
+                }
+                const col = String.fromCharCode(indices.colIndex + diffC + 65);
+                const row = indices.rowIndex + diffR + 1;
+                return col + String(row);
               });
             }
             const thenewFormula = newFormula.replace(selectedCells, JSON.stringify(newref));
