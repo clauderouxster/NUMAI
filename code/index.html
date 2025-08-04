@@ -363,6 +363,30 @@
         console.log("Formula recalculation complete.");
       }
 
+      function checkLines(tableau) {
+        // Gérer le cas où le tableau est vide ou n'a qu'un seul élément
+        if (!tableau || tableau.length <= 1) {
+          return false;
+        }
+
+        // Extraire la partie numérique de la première chaîne
+        const ligneDeReference = tableau[0].substring(1); // On prend tout ce qui est après le premier caractère
+
+        // Parcourir le reste du tableau et comparer
+        for (let i = 1; i < tableau.length; i++) {
+          // Extraire la partie numérique de la chaîne actuelle
+          const ligneActuelle = tableau[i].substring(1);
+
+          // Si une des lignes ne correspond pas, on renvoie false immédiatement
+          if (ligneActuelle !== ligneDeReference) {
+            return false;
+          }
+        }
+
+        // Si la boucle se termine sans trouver de différence, toutes les lignes sont identiques
+        return true;
+      }
+
       // NEW: Function to save the formula from the textarea to the grid
       function saveFormulaFromInput() {
         if (!activeCell) return;
@@ -383,28 +407,40 @@
           }
         } else {
           if (newFormula.includes("getValuesFromReferences")) {
-              const match = newFormula.match(/\[(.*?)\]/);
-              const selectedCells = match ? `[${match[1]}]` : `[]`;
-              let selectedRef = selectedCells;
-              if (selectedRef.includes("'")) {
-                selectedRef = selectedRef.replace(/'/g, '"');
-              }
-              const selectedReferences = JSON.parse(selectedRef);
-              //The list of references  
-              const newref = selectedReferences.map(ref => {
+            const match = newFormula.match(/\[(.*?)\]/);
+            const selectedCells = match ? `[${match[1]}]` : `[]`;
+            let selectedRef = selectedCells;
+            if (selectedRef.includes("'")) {
+              selectedRef = selectedRef.replace(/'/g, '"');
+            }
+            const selectedReferences = JSON.parse(selectedRef);
+            let newref = null;
+            //The list of references
+            if (checkLines(selectedReferences)) {
+              newref = selectedReferences.map(ref => {
+                return ref[0] + String(rowIndex+1);
+              });
+            }
+            else {
+              let diff = null;
+              newref = selectedReferences.map(ref => {
                 const indices = getIndicesFromCellName(ref);
-                const col = String.fromCharCode(colIndex + 65);
+                if (diff === null) {
+                  diff = colIndex - indices.colIndex;
+                }
+                const col = String.fromCharCode(indices.colIndex + diff + 65);
                 return col + ref.substring(1);
               });
-              const thenewFormula = newFormula.replace(selectedCells, JSON.stringify(newref));
-              myFormulas[rowIndex][colIndex] = thenewFormula;
-              try {
-                recalculateAllFormulas();
-              } catch (error) {
-                console.error(`Error evaluating formula in cell ${getCellName(rowIndex, colIndex)}:`, error);
-                myGrid[rowIndex][colIndex] = '#ERROR!';
-                activeCell.textContent = '#ERROR!';
-              }
+            }
+            const thenewFormula = newFormula.replace(selectedCells, JSON.stringify(newref));
+            myFormulas[rowIndex][colIndex] = thenewFormula;
+            try {
+              recalculateAllFormulas();
+            } catch (error) {
+              console.error(`Error evaluating formula in cell ${getCellName(rowIndex, colIndex)}:`, error);
+              myGrid[rowIndex][colIndex] = '#ERROR!';
+              activeCell.textContent = '#ERROR!';
+            }
           }
           else {
             // If the formula is empty, clear the formula and keep the original value
@@ -623,7 +659,7 @@
       const table = document.getElementById('myGrid');
       const calculateButton = document.getElementById('calculate-button');
       const formulaInput = document.getElementById('formula-input');
-      
+
       // Event listeners
 
       // NEW: Event listener for the formula-input field
@@ -644,7 +680,7 @@
         }
       });
       formulaInput.addEventListener('blur', saveFormulaFromInput);
-      
+
 
       document.getElementById('save-button').addEventListener('click', saveGridData);
       document.getElementById('load-button').addEventListener('click', loadGridData);
