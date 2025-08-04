@@ -384,7 +384,11 @@
         } else {
           if (newFormula.includes("getValuesFromReferences")) {
               const match = newFormula.match(/\[(.*?)\]/);
-              const selectedRef = match ? `[${match[1]}]` : `[]`;
+              const selectedCells = match ? `[${match[1]}]` : `[]`;
+              let selectedRef = selectedCells;
+              if (selectedRef.includes("'")) {
+                selectedRef = selectedRef.replace(/'/g, '"');
+              }
               const selectedReferences = JSON.parse(selectedRef);
               //The list of references  
               const newref = selectedReferences.map(ref => {
@@ -392,7 +396,7 @@
                 const col = String.fromCharCode(colIndex + 65);
                 return col + ref.substring(1);
               });
-              const thenewFormula = newFormula.replace(selectedRef, JSON.stringify(newref));
+              const thenewFormula = newFormula.replace(selectedCells, JSON.stringify(newref));
               myFormulas[rowIndex][colIndex] = thenewFormula;
               try {
                 recalculateAllFormulas();
@@ -451,11 +455,9 @@
             }
             else {
               cell.textContent = newValue;
-              if (newValue != myGrid[rowIndex][colIndex]) {
-                myFormulas[rowIndex][colIndex] = "";
-                myGrid[rowIndex][colIndex] = newValue;
-                recalculateAllFormulas();
-              }
+              myFormulas[rowIndex][colIndex] = "";
+              myGrid[rowIndex][colIndex] = newValue;
+              recalculateAllFormulas();
             }
 
             // Simply update the grid data and the cell's text content            
