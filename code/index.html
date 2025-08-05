@@ -81,6 +81,30 @@
   <h1>NUMAI</h1>
 
 
+  <div style="margin-top: 20px;">
+    <button id="toggle-settings-button">LLM-Server Settings</button>
+  </div>
+  <div id="settings-panel" style="margin-top: 10px; border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
+    <h2>Configuration LLM</h2>
+    <div style="margin-bottom: 10px;">
+      <label>
+        <input type="radio" name="llm_choice" value="ollama" checked> Ollama
+      </label>
+      <label>
+        <input type="radio" name="llm_choice" value="lmstudio"> LM Studio
+      </label>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="url-input">URL:</label>
+      <input type="text" id="url-input" style="width: 300px; padding: 5px;">
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="model-input">Model:</label>
+      <input type="text" id="model-input" style="width: 300px; padding: 5px;">
+    </div>
+    <button id="save-settings-button">Set</button>
+  </div>
+
   <div class="controls" style="display: flex; align-items: center; gap: 10px;">
     <button id="calculate-button">Generate</button>
     <textarea id="formula-input" rows="4" cols="50" placeholder="Edit or view formula here..."
@@ -108,7 +132,7 @@
       window.ollama_url = "http://localhost:11434";
       window.ollama_model = "codestral";
 
-      window.selectOllama = true;
+      window.selectOllama = false;
 
       let isSelecting = false;
       let startRowIndex = null;
@@ -223,7 +247,7 @@
           return response;
         }
         const response = await call_lm_studio(llm_url, llm_model, prompt);
-        return response;  
+        return response;
       }
 
       function getIndicesFromCellName(cellName) {
@@ -744,6 +768,56 @@
 
         fileInput.click();
       }
+
+      // NEW: Fonctions pour le panneau de configuration
+      function updateSettingsPanel() {
+        const urlInput = document.getElementById('url-input');
+        const modelInput = document.getElementById('model-input');
+
+        if (window.selectOllama) {
+          document.querySelector('input[value="ollama"]').checked = true;
+          urlInput.value = window.ollama_url;
+          modelInput.value = window.ollama_model;
+        } else {
+          document.querySelector('input[value="lmstudio"]').checked = true;
+          urlInput.value = window.llm_url;
+          modelInput.value = window.llm_model;
+        }
+      }
+
+      function saveSettings() {
+        const urlInput = document.getElementById('url-input').value;
+        const modelInput = document.getElementById('model-input').value;
+
+        if (window.selectOllama) {
+          window.ollama_url = urlInput;
+          window.ollama_model = modelInput;
+        } else {
+          window.llm_url = urlInput;
+          window.llm_model = modelInput;
+        }
+        console.log("Paramètres sauvegardés:", window.selectOllama ? "Ollama" : "LM Studio", "URL:", urlInput, "Modèle:", modelInput);
+      }
+
+      // NEW: Ajout de la logique pour afficher/masquer le panneau
+      const settingsPanel = document.getElementById('settings-panel');
+      const toggleButton = document.getElementById('toggle-settings-button');
+
+      toggleButton.addEventListener('click', () => {
+        settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+      });
+
+      // Initialisation du panneau et des événements
+      updateSettingsPanel();
+
+      document.querySelectorAll('input[name="llm_choice"]').forEach(radio => {
+        radio.addEventListener('change', (event) => {
+          window.selectOllama = event.target.value === 'ollama';
+          updateSettingsPanel();
+        });
+      });
+
+      document.getElementById('save-settings-button').addEventListener('click', saveSettings);
 
       renderGrid(myGrid, numRows, numCols);
 
