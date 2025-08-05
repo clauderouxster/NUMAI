@@ -102,8 +102,13 @@
       window.activeCell = null;
 
       //LM Studio connection parameters
-      window.baseurl = "ws://localhost:1234";
-      window.model = "codestral-22b-v0.1-mlx-3";
+      window.llm_url = "ws://localhost:1234";
+      window.llm_model = "codestral-22b-v0.1-mlx-3";
+
+      window.ollama_url = "http://localhost:11434";
+      window.ollama_model = "codestral";
+
+      window.selectOllama = true;
 
       let isSelecting = false;
       let startRowIndex = null;
@@ -173,6 +178,28 @@
         console.log('Rendu de la grille terminé.');
       }
 
+      async function call_ollama(ollama_url, model, prompt) {
+        try {
+          const response = await fetch(`${ollama_url}/api/generate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model,
+              prompt: prompt,
+              stream: false, // Set to true for streaming responses
+            }),
+          });
+
+          const data = await response.json();
+          console.log('Generated text:', data.response);
+          return data.response;
+        } catch (error) {
+          console.error('Error generating completion:', error);
+        }
+      }
+
       async function call_lm_studio(baseurl, model, prompt) {
         try {
           if (typeof lm_studio !== 'function') throw new Error("lm_studio function not found. Check lmstudio.bundle.js");
@@ -188,6 +215,15 @@
           }
           throw error;
         }
+      }
+
+      async function call_llm(prompt) {
+        if (selectOllama) {
+          const response = await call_ollama(ollama_url, ollama_model, prompt);
+          return response;
+        }
+        const response = await call_lm_studio(llm_url, llm_model, prompt);
+        return response;  
       }
 
       function getIndicesFromCellName(cellName) {
@@ -288,7 +324,7 @@
               const userPrompt = `${formula.substring(1)}`;
 
               try {
-                const llmResponse = await call_lm_studio(baseurl, model, systemPrompt + "\n" + userPrompt);
+                const llmResponse = await call_llm(systemPrompt + "\n" + userPrompt);
 
                 // Use the new function to extract code from the response
                 let codeToExecute = extractCode(llmResponse);
